@@ -1233,7 +1233,7 @@ syncUI(); render();
   var E=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
   var STOP=new Set('a an and the of for to in on at is are do does i we my our what whats what\'s who whom how when where which with need needs needed should can about tell me show give list any all program programs bulletin please on from by it its this that their there be get have has job jobs us inc llc corp co company group services service insurance commercial'.split(' '));
   var TOPICS=[
-    {k:'upload',re:/upload|deadline|\bdue\b|how (long|many days)|turn ?in|submit|final|include|document|paperwork|need to send|closing/},
+    {k:'upload',re:/certificate|satisfaction|\bcos\b|w-?9|tax id|work order|\bpo\b|purchase order|photos? (for|on) upload|upload|deadline|\bdue\b|how (long|many days)|turn ?in|submit|final|include|document|paperwork|need to send|closing/},
     {k:'fees',re:/discount|fee|credit|percent|%|withh|admin|royalt|charge|rebate|deduct(?!ible)/},
     {k:'ded',re:/deductible/},
     {k:'pay',re:/pay|terms|net ?\d|invoice|bill|check|paid|remit/},
@@ -1253,18 +1253,28 @@ syncUI(); render();
   function findPrograms(q){
     var n=norm(q), out=[];
     var bm=n.match(/\b(\d{4,5})(-?s?f)?\b/);
-    if(bm){DATA.forEach(function(r,i){if(live(r)&&String(r.bulletin||'').indexOf(bm[1])>=0)out.push({i:i,s:100})}); if(out.length) return out}
-    var toks=n.replace(/\bnet ?\d+\b|\b\d+ ?days?\b/g,' ').split(' ').filter(function(t){return t.length>1&&!STOP.has(t)&&!(ST[t]&&t.length>2)&&!/^(upload|deadline|due|final|include|discount|fee|fees|deductible|pay|terms|nte|limit|contact|marketing|states|estimate|photos?|approval|days?|collect|dont|allowed|direct|hq|net|carrier|carriers|local|cover|covers|covered|coverage|where|region|call|contact|discount|discounts|charge|charges|payment|paid|pays|invoice|estimating|deadlines?)$/.test(t)});
-    if(!toks.length) return [];
+    if(bm){DATA.forEach(function(r,i){if(live(r)&&String(r.bulletin||'').indexOf(bm[1])>=0)out.push({i:i,s:100,cov:1,hit:1,nt:1,mw:[bm[1]],ph:true})}); if(out.length) return out}
+    var GEN=/^(insurance|ins|company|companies|inc|llc|corp|corporation|co|group|services|service|the|of|and|&|management|holdings|ltd|lp|llp|na|usa|us|-|related|to|formerly|a|an|for|on|at|in)$/;
+    var QX=/^(upload|uploads|uploading|deadline|deadlines|due|final|include|including|discount|discounts|fee|fees|deductible|pay|pays|paid|payment|terms|nte|limit|contact|marketing|states|estimate|estimating|photos?|approval|days?|collect|dont|allowed|direct|hq|net|carrier|carriers|local|cover|covers|covered|coverage|where|region|call|discount|charge|charges|invoice|claim|claims|job|jobs|program|programs|loss|losses|water|fire|mold|need|needs|required|requirements|certificate|satisfaction|work|order|admin|equipment|give|want|wants|does|did|have|has|many|much|long|there|they|them|we|you|our|your|us|do|i|is|are|what|whats|which|who|how|when|can|should|would|could|the|a|an|to|for|on|of|in|at|with|and|or|any|all|me|my|it|its|this|that|be|get)$/;
+    var qw=n.split(' ').filter(function(w){return w&&!QX.test(w)});
+    if(!qw.length) return out;
+    function wm(c){return qw.some(function(w){return w===c||(c.length>=4&&w.length>=4&&(w.indexOf(c)===0||c.indexOf(w)===0)&&Math.abs(w.length-c.length)<=3)||(c.length>=5&&lev1(w,c))})}
     DATA.forEach(function(r,i){ if(!live(r)) return;
-      var nm=norm(r.name+' '+(r.aka||'')), words=nm.split(' '), s=0, hit=0;
-      if(nm.indexOf(toks.join(' '))>=0) s+=6;
-      toks.forEach(function(t){ if(words.indexOf(t)>=0){s+=3;hit++} else if(t.length>=4&&words.some(function(w){return w.indexOf(t)===0})){s+=2;hit++} else if(t.length>=5&&words.some(function(w){return lev1(w,t)})){s+=1.5;hit++} });
-      if(hit&&norm(r.name).indexOf(toks[0])===0) s+=1; var full=norm(String(r.name).replace(/\(.*$/,'')).trim(); if(hit&&full.length>3&&n.indexOf(full)>=0) s+=10+full.length/100;
-      if(hit) out.push({i:i,s:s-0.02*words.length,hit:hit,nt:toks.length,toks:toks});
+      var nm=String(r.name), par=(nm.match(/\(([^)]*)\)/g)||[]).map(function(x){return x.slice(1,-1)});
+      var vars=[nm].concat(par,String(r.aka||'').split(/[,;\/]| \| /)).filter(function(v){return v&&v.trim().length>1});
+      var best=null;
+      vars.forEach(function(v,vi){
+        var core=norm(v.replace(/\(.*?\)/g,' ')).split(' ').filter(function(w){return w&&!GEN.test(w)&&!/^(formerly|related|and)$/.test(w)});
+        if(!core.length) return;
+        var mw=core.filter(wm); if(!mw.length) return;
+        var cov=mw.length/core.length, s=cov*10+(cov===1?core.length*0.5:0)-(vi?0.2:0), full=norm(v.replace(/\(.*?\)/g,' ')).trim(), ph=full.length>3&&(' '+n+' ').indexOf(' '+full+' ')>=0;
+        if(ph) s+=3;
+        if(!best||s>best.s) best={i:i,s:s,cov:cov,hit:mw.length,nt:core.length,mw:mw,ph:ph};
+      });
+      if(best) out.push(best);
     });
     out.sort(function(a,b){return b.s-a.s});
-    return out;
+    out.qw=qw; return out;
   }
   function rowsFrom(r,labels){var d=document.createElement('div');try{d.innerHTML=feesBlock(r)}catch(e){return []}var res=[];d.querySelectorAll('.fu-row').forEach(function(x){var h=x.querySelector('h4');if(!h)return;var lab=h.textContent.trim();if(labels.indexOf(lab)>=0){var body=x.querySelector('div');res.push([lab,body?body.innerHTML:''])}});return res}
   function stdFor(r){try{var k=stdKeyFor(r);return k&&STDI[k]?STDI[k]:null}catch(e){return null}}
@@ -1301,13 +1311,24 @@ syncUI(); render();
     var n=norm(q); var p0=findPrograms(q); var tn=n; if(p0.length&&p0[0].hit){norm(DATA[p0[0].i].name+' '+(DATA[p0[0].i].aka||'')).split(' ').forEach(function(w){if(w.length>1)tn=tn.replace(new RegExp('\\b'+w.replace(/[^a-z0-9]/g,'')+'\\b','g'),' ')})} var topics=TOPICS.filter(function(t){return t.re.test(tn)}).map(function(t){return t.k});
     var sm=n.match(/\b(5042|5308|4449)\b/); if(sm&&!/\b\d{4,5}-?s?f\b/.test(n.replace(sm[0]+'-f',''))&&!findPrograms(q).some(function(p){return true})){}
     if(sm&&/standard|5042|5308|4449/.test(n)&&/standard/.test(n)){var s=STDI[sm[1]+'-F'];return '<div class="ask-card"><h5>'+E(s[0])+'</h5><dl><dt>Final upload items</dt><dd><ul>'+s[1].map(function(x){return '<li>'+E(x)+'</li>'}).join('')+'</ul></dd></dl></div>'}
-    var p=p0; if(/\bprograms\b|\bwhich\b|\blist\b/.test(n)){var l1=listAnswer(q);if(l1&&(!p.length||p[0].hit<p[0].nt))return l1}
+    var p=p0; if(/\bprograms\b|\bwhich\b|\blist\b|\bcarriers\b/.test(n)){var l1=listAnswer(q);if(l1&&(!p.length||p[0].cov<1||!p[0].ph&&p[0].hit<2))return l1}
+    var LC=/\bprograms\b|\bwhich\b|\blist\b|\bcarriers\b|\ball\b/.test(n);
+    if(!p.length&&p.qw&&p.qw.length&&!LC) return '<div>I couldn’t find a program called “'+E(p.qw.join(' '))+'”.</div><div class="ask-note">If the client isn’t listed, it isn’t a national account program on this site. Try another spelling or the bulletin number.</div>';
     if(p.length){
-      if(p[0].s<100&&p[0].hit<p[0].nt){var l0=listAnswer(q);if(l0)return l0;return '<div>I don’t see a program called “'+E(p[0].toks.join(' '))+'”. Closest matches:</div><div class="ask-chips">'+p.slice(0,6).map(function(x){return '<button class="ask-chip" data-pick="'+x.i+'" data-q="'+E(q)+'">'+E(DATA[x.i].name)+'</button>'}).join('')+'</div><div class="ask-note">If the client isn’t listed, it isn’t a national account program on this site.</div>'}
-      var top=p[0].s, close=p.filter(function(x){return x.s>=top-0.6});
-      if(close.length===1) return card(close[0].i,n,topics);
-      if(p[0].s>=100&&close.length<=4) return close.map(function(x){return card(x.i,n,topics)}).join('');
-      return '<div>A few programs match. Which one?</div><div class="ask-chips">'+close.slice(0,8).map(function(x){return '<button class="ask-chip" data-pick="'+x.i+'" data-q="'+E(q)+'">'+E(DATA[x.i].name)+'</button>'}).join('')+'</div>';
+      var chips=function(arr,msg){return '<div>'+msg+'</div><div class="ask-chips">'+arr.slice(0,8).map(function(x){return '<button class="ask-chip" data-pick="'+x.i+'" data-q="'+E(q)+'">'+E(DATA[x.i].name)+'</button>'}).join('')+'</div>'+(arr.length>8?'<div class="ask-note">'+arr.length+' match. Type more of the name to narrow it down.</div>':'')};
+      var top=p[0];
+      if(top.s>=100) return p.slice(0,4).map(function(x){return card(x.i,n,topics)}).join('');
+      var phs=p.filter(function(x){return x.ph}); if(phs.length){phs.sort(function(a,b){return b.nt-a.nt||b.s-a.s});return card(phs[0].i,n,topics)}
+      var grp=p.filter(function(x){return x.mw.some(function(w){return top.mw.indexOf(w)>=0})}); var left=(p.qw||[]).filter(function(w){return !top.mw.some(function(c){return c===w||(w.length>=4&&(w.indexOf(c)===0||c.indexOf(w)===0))||lev1(w,c)})});
+      if(top.cov===1){ var full1=grp.filter(function(x){return x.cov===1});
+        if(grp.length===1||(full1.length===1&&top.hit>=2)) return card(top.i,n,topics);
+        return chips(grp,'A few programs match. Which one?') }
+      if(top.cov<1&&left.length&&!LC) return chips(p,'I couldn’t find a program called “'+E(p.qw.join(' '))+'”. Closest programs:')+'<div class="ask-note">If the client isn’t listed, it isn’t a national account program on this site.</div>';
+      if(top.cov>=0.5){ var l2=listAnswer(q); if(l2&&top.hit<2) return l2;
+        if(grp.length===1) return card(top.i,n,topics);
+        return chips(grp,'A few programs match. Which one?') }
+      var l3=listAnswer(q); if(l3) return l3;
+      return chips(p,'I couldn’t find an exact match. Closest programs:')+'<div class="ask-note">If the client isn’t listed, it isn’t a national account program on this site.</div>';
     }
     var l=listAnswer(q); if(l) return l;
     return '<div>I couldn\'t match that to a program. Try the client or carrier name, a bulletin number, or a question like:</div><div class="ask-chips"><button class="ask-chip" data-ex="Allstate final upload">Allstate final upload</button><button class="ask-chip" data-ex="Chubb deductible">Chubb deductible</button><button class="ask-chip" data-ex="net 60 programs">Net 60 programs</button><button class="ask-chip" data-ex="insurance programs in CO">Insurance programs in CO</button></div>';
