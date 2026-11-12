@@ -1254,13 +1254,13 @@ syncUI(); render();
     var n=norm(q), out=[];
     var bm=n.match(/\b(\d{4,5})(-?s?f)?\b/);
     if(bm){DATA.forEach(function(r,i){if(live(r)&&String(r.bulletin||'').indexOf(bm[1])>=0)out.push({i:i,s:100})}); if(out.length) return out}
-    var toks=n.replace(/\bnet ?\d+\b|\b\d+ ?days?\b/g,' ').split(' ').filter(function(t){return t.length>1&&!STOP.has(t)&&!(ST[t]&&t.length>2)&&!/^(upload|deadline|due|final|include|discount|fee|fees|deductible|pay|terms|nte|limit|contact|marketing|states|estimate|photos?|approval|days?|collect|dont|allowed|direct|hq|net|carrier|carriers|local)$/.test(t)});
+    var toks=n.replace(/\bnet ?\d+\b|\b\d+ ?days?\b/g,' ').split(' ').filter(function(t){return t.length>1&&!STOP.has(t)&&!(ST[t]&&t.length>2)&&!/^(upload|deadline|due|final|include|discount|fee|fees|deductible|pay|terms|nte|limit|contact|marketing|states|estimate|photos?|approval|days?|collect|dont|allowed|direct|hq|net|carrier|carriers|local|cover|covers|covered|coverage|where|region|call|contact|discount|discounts|charge|charges|payment|paid|pays|invoice|estimating|deadlines?)$/.test(t)});
     if(!toks.length) return [];
     DATA.forEach(function(r,i){ if(!live(r)) return;
       var nm=norm(r.name+' '+(r.aka||'')), words=nm.split(' '), s=0, hit=0;
       if(nm.indexOf(toks.join(' '))>=0) s+=6;
       toks.forEach(function(t){ if(words.indexOf(t)>=0){s+=3;hit++} else if(t.length>=4&&words.some(function(w){return w.indexOf(t)===0})){s+=2;hit++} else if(t.length>=5&&words.some(function(w){return lev1(w,t)})){s+=1.5;hit++} });
-      if(hit&&norm(r.name).indexOf(toks[0])===0) s+=1;
+      if(hit&&norm(r.name).indexOf(toks[0])===0) s+=1; var full=norm(String(r.name).replace(/\(.*$/,'')).trim(); if(hit&&full.length>3&&n.indexOf(full)>=0) s+=10+full.length/100;
       if(hit) out.push({i:i,s:s-0.02*words.length,hit:hit,nt:toks.length,toks:toks});
     });
     out.sort(function(a,b){return b.s-a.s});
@@ -1298,10 +1298,10 @@ syncUI(); render();
     return h;
   }
   function answer(q){
-    var n=norm(q), topics=TOPICS.filter(function(t){return t.re.test(n)}).map(function(t){return t.k});
+    var n=norm(q); var p0=findPrograms(q); var tn=n; if(p0.length&&p0[0].hit){norm(DATA[p0[0].i].name+' '+(DATA[p0[0].i].aka||'')).split(' ').forEach(function(w){if(w.length>1)tn=tn.replace(new RegExp('\\b'+w.replace(/[^a-z0-9]/g,'')+'\\b','g'),' ')})} var topics=TOPICS.filter(function(t){return t.re.test(tn)}).map(function(t){return t.k});
     var sm=n.match(/\b(5042|5308|4449)\b/); if(sm&&!/\b\d{4,5}-?s?f\b/.test(n.replace(sm[0]+'-f',''))&&!findPrograms(q).some(function(p){return true})){}
     if(sm&&/standard|5042|5308|4449/.test(n)&&/standard/.test(n)){var s=STDI[sm[1]+'-F'];return '<div class="ask-card"><h5>'+E(s[0])+'</h5><dl><dt>Final upload items</dt><dd><ul>'+s[1].map(function(x){return '<li>'+E(x)+'</li>'}).join('')+'</ul></dd></dl></div>'}
-    var p=findPrograms(q); if(/\bprograms\b|\bwhich\b|\blist\b/.test(n)){var l1=listAnswer(q);if(l1&&(!p.length||p[0].hit<p[0].nt))return l1}
+    var p=p0; if(/\bprograms\b|\bwhich\b|\blist\b/.test(n)){var l1=listAnswer(q);if(l1&&(!p.length||p[0].hit<p[0].nt))return l1}
     if(p.length){
       if(p[0].s<100&&p[0].hit<p[0].nt){var l0=listAnswer(q);if(l0)return l0;return '<div>I don’t see a program called “'+E(p[0].toks.join(' '))+'”. Closest matches:</div><div class="ask-chips">'+p.slice(0,6).map(function(x){return '<button class="ask-chip" data-pick="'+x.i+'" data-q="'+E(q)+'">'+E(DATA[x.i].name)+'</button>'}).join('')+'</div><div class="ask-note">If the client isn’t listed, it isn’t a national account program on this site.</div>'}
       var top=p[0].s, close=p.filter(function(x){return x.s>=top-0.6});
@@ -1329,7 +1329,7 @@ syncUI(); render();
   fab.addEventListener('click',function(){panel.classList.add('on');fab.style.display='none';setTimeout(function(){inp.focus()},50)});
   panel.querySelector('#ask-x').addEventListener('click',function(){panel.classList.remove('on');fab.style.display=''});
   panel.querySelector('#ask-form').addEventListener('submit',function(e){e.preventDefault();ask(inp.value);inp.value=''});
-  log.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.open)openProgram(+b.dataset.open);else if(b.dataset.ex)ask(b.dataset.ex);else if(b.dataset.pick){var i=+b.dataset.pick,q=b.dataset.q||'';say('ask-me',E(DATA[i].name));var n=norm(q);say('ask-bot',card(i,n,TOPICS.filter(function(t){return t.re.test(n)}).map(function(t){return t.k})))}});
+  log.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.open)openProgram(+b.dataset.open);else if(b.dataset.ex)ask(b.dataset.ex);else if(b.dataset.pick){var i=+b.dataset.pick,q=b.dataset.q||'';say('ask-me',E(DATA[i].name));var n=norm(q);norm(DATA[i].name).split(' ').forEach(function(w){if(w.length>1)n=n.replace(new RegExp('\\b'+w.replace(/[^a-z0-9]/g,'')+'\\b','g'),' ')});say('ask-bot',card(i,n,TOPICS.filter(function(t){return t.re.test(n)}).map(function(t){return t.k})))}});
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panel.classList.contains('on')){panel.classList.remove('on');fab.style.display=''}});
 })();
 </script>
